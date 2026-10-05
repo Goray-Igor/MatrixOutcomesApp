@@ -1,5 +1,7 @@
 import pandas as pd
+
 from database.connection import execute_query
+
 
 def get_contracts(user_id, role):
     """Отримує всі договори. Адмін бачить все, фахівець - тільки свої села."""
@@ -42,9 +44,32 @@ def save_manager_result(record_uid, manager_id, outcome, exit_order, competitor,
     execute_query(query, (record_uid, manager_id, outcome, exit_order, competitor, contact_type, contact_info, comment, is_conflict, status_calc), fetch=False)
 
 def update_manager_result(result_id, outcome, exit_order, competitor, contact_type, contact_info, comment, is_conflict, status_calc):
+    # Стан ДО змін: старий результат і наявність активного рішення ЗС
+    prev = execute_query("""
+        SELECT r.RecordUID, r.Outcome, d.DecisionID
+        FROM tbl_Manager_Results r
+        LEFT JOIN tbl_LandOfficer_Decisions d ON d.RecordUID = r.RecordUID AND d.IsActive = 1
+        WHERE r.ResultID = ?
+    """, (result_id,))
+
     query = """
         UPDATE tbl_Manager_Results 
         SET Outcome=?, ExitOrder=?, CompetitorName=?, ContactType=?, ContactInfo=?, Comment=?, IsConflict=?, ProcessingStatus=?, IsLocked=1, UpdatedAt=GETDATE()
         WHERE ResultID=?
     """
-    execute_query(query, (outcome, exit_order, competitor, contact_type, contact_info, comment, is_conflict, status_calc, result_id), fetch=False)
+    ok = execute_query(query, (outcome, exit_order, competitor, contact_type, contact_info, comment, is_conflict, status_calc, result_id), fetch=False)
+
+    # Якщо ЗС вже опрацювала цей запис — сповіщаємо про повторну обробку
+    if ok and prev and prev[0]['DecisionID'] is not None:
+        p = prev[0]
+        q_notify = """
+            IF EXISTS (SELECT 1 FROM tbl_LandOfficer_Notifications WHERE RecordUID = ? AND Status = 'New')
+                UPDATE tbl_LandOfficer_Notifications
+                SET NewOutcome = ?, CreatedAt = GETDATE()
+                WHERE RecordUID = ? AND Status = 'New'
+            ELSE
+                INSERT INTO tbl_LandOfficer_Notifications (RecordUID, ResultID, DecisionID, OldOutcome, NewOutcome)
+                VALUES (?, ?, ?, ?, ?)
+        """
+        execute_query(q_notify, (p['RecordUID'], outcome, p['RecordUID'],
+                                 p['RecordUID'], result_id, p['DecisionID'], p['Outcome'], outcome), fetch=False)

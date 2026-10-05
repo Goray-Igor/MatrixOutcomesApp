@@ -51,8 +51,8 @@ def render_landman_card(row, uid, contract_num, owner, tab_type, subrole, user_r
         st.error("⚠️ Увага! Фахівець позначив цього пайовика як КОНФЛІКТНОГО.")
     st.write(f"**Коментар фахівця:** {clean_str(row.get('ManagerComment'))}")
 
-        # --- БЛОК 3: РЕЗУЛЬТАТ ЗЕМЕЛЬНОЇ СЛУЖБИ (тільки для оброблених) ---
-    if tab_type == 'done':
+        # --- БЛОК 3: РЕЗУЛЬТАТ ЗЕМЕЛЬНОЇ СЛУЖБИ (оброблені + сповіщення) ---
+    if tab_type in ('done', 'notif'):
         st.markdown("##### 🛠️ Результат Земельної служби")
         with st.container(border=True):
             d1, d2 = st.columns(2)
@@ -71,9 +71,13 @@ def render_landman_card(row, uid, contract_num, owner, tab_type, subrole, user_r
             st.write(f"**Коментар ЗС:** {clean_str(row.get('LandmanComment'))}")
     
     # --- КНОПКА ДІЇ ---
-    if tab_type in ['out', 'res'] and (subrole in ['Type1', 'Type2'] or user_role == 'Admin'):
-        if st.button("📝 Опрацювати рішення", key=f"btn_land_{uid}"):
-            on_process_click(uid, contract_num, owner, row)
+        # --- КНОПКА ДІЇ ---
+    if (
+        tab_type in ['out', 'res']
+        and (subrole in ['Type1', 'Type2'] or user_role == 'Admin')
+        and st.button("📝 Опрацювати рішення", key=f"btn_land_{uid}")
+    ):
+        on_process_click(uid, contract_num, owner, row)
     st.markdown("---")
 
 def render_landman_form(on_save_callback=None):
@@ -89,11 +93,11 @@ def render_landman_form(on_save_callback=None):
     with st.container(border=True):
         col1, col2 = st.columns(2)
         with col1:
-            rem_cad = st.text_input("Вилучені кадастрові номери", value=clean_str(row.get('CadastralNumber'), ""))
-            rem_vil = st.text_input("Село (вилучення)", value=clean_str(row.get('Village'), ""))
-            rem_field = st.text_input("Поле (вилучення)", value=clean_str(row.get('FieldNumber'), ""))
-            rem_share = st.text_input("№ Паю (вилучення)", value=clean_str(row.get('ShareNumber'), ""))
-            rem_area = st.number_input("Вилучена площа (га)", value=float(row.get('Area') or 0.0))
+            rem_cad = st.text_input("Вилучені кадастрові номери", value=clean_str(row.get('RemovedCadastralNumbers'), clean_str(row.get('CadastralNumber'), "")))
+            rem_vil = st.text_input("Село (вилучення)", value=clean_str(row.get('RemovedVillage'), clean_str(row.get('Village'), "")))
+            rem_field = st.text_input("Поле (вилучення)", value=clean_str(row.get('RemovedField'), clean_str(row.get('FieldNumber'), "")))
+            rem_share = st.text_input("№ Паю (вилучення)", value=clean_str(row.get('RemovedShareNumber'), clean_str(row.get('ShareNumber'), "")))
+            rem_area = st.number_input("Вилучена площа (га)", value=float(row.get('RemovedArea') if pd.notnull(row.get('RemovedArea')) else (row.get('Area') or 0.0)))
         
         with col2:
             counterparty = st.text_input("Пайовик (Контрагент)", value=owner)
