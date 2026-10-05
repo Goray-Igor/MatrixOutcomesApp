@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Streamlit (САМОЕ ВАЖНОЕ)
+.streamlit/secrets.toml
+
+# VS Code
+.vscode/
+.history/
+
+# MS SQL & OS
+*.log
+Thumbs.db
+Desktop.ini
+
+# Дані та конфіги
+*.xlsx
+*.csv
+.env
+venv/
+.venv/
+__pycache__/
+.env
+.env.*
+.venv/
+node_modules/
+*.bak
+*.mdf
+*.ldf
+*.dump
+*.sql.zip
