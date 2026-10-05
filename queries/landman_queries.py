@@ -1,5 +1,7 @@
 import pandas as pd
+
 from database.connection import execute_query
+
 
 def get_landman_contracts(user_id, role):
     """Отримує договори з рішеннями Фахівців та самої Зем. служби.
@@ -11,10 +13,14 @@ def get_landman_contracts(user_id, role):
             m.*, 
             r.ResultID, r.Outcome AS ManagerOutcome, r.ProcessingStatus AS ManagerStatus,
             r.ExitOrder, r.CompetitorName, r.ContactType, r.ContactInfo, r.Comment AS ManagerComment, r.IsConflict, r.UpdatedAt,
-            d.DecisionID, d.BoundarySettingDate, d.TerminationDate1C, d.OfficerID
+            d.DecisionID, d.OfficerID, uo.FullName AS OfficerName,
+            d.RemovedCadastralNumbers, d.RemovedVillage, d.RemovedField, d.RemovedShareNumber, d.RemovedArea,
+            d.Counterparty AS LandmanCounterparty, d.Comment AS LandmanComment,
+            d.BoundarySettingDate, d.TerminationDate1C, d.DecisionDate
         FROM tbl_MainRegistry m
         LEFT JOIN tbl_Manager_Results r ON m.RecordUID = r.RecordUID
         LEFT JOIN tbl_LandOfficer_Decisions d ON m.RecordUID = d.RecordUID
+        LEFT JOIN tbl_Users uo ON d.OfficerID = uo.UserID
     """
     
     # Виконуємо запит без прив'язки до UserID, бо доступ потрібен до всього масиву

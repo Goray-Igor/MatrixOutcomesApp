@@ -1,11 +1,17 @@
-import streamlit as st
 import pandas as pd
+import streamlit as st
+
 from queries.landman_queries import save_landman_decision
+
 
 def clean_str(val, default="-"):
     if pd.isna(val) or str(val).strip().lower() in ['nan', 'none', 'nat', '']:
         return default
     return str(val)
+
+def fmt_date(val, fmt='%d.%m.%Y'):
+    dt = pd.to_datetime(val, errors='coerce')
+    return dt.strftime(fmt) if pd.notnull(dt) else '-'
 
 def render_landman_card(row, uid, contract_num, owner, tab_type, subrole, user_role, on_process_click):
     """Малює розширену картку договору для Земельника"""
@@ -44,6 +50,25 @@ def render_landman_card(row, uid, contract_num, owner, tab_type, subrole, user_r
     if row.get('IsConflict'):
         st.error("⚠️ Увага! Фахівець позначив цього пайовика як КОНФЛІКТНОГО.")
     st.write(f"**Коментар фахівця:** {clean_str(row.get('ManagerComment'))}")
+
+        # --- БЛОК 3: РЕЗУЛЬТАТ ЗЕМЕЛЬНОЇ СЛУЖБИ (тільки для оброблених) ---
+    if tab_type == 'done':
+        st.markdown("##### 🛠️ Результат Земельної служби")
+        with st.container(border=True):
+            d1, d2 = st.columns(2)
+            with d1:
+                st.write(f"**Вилучені кадастрові:** {clean_str(row.get('RemovedCadastralNumbers'))}")
+                st.write(f"**Село:** {clean_str(row.get('RemovedVillage'))}")
+                st.write(f"**Поле:** {clean_str(row.get('RemovedField'))}")
+                st.write(f"**№ Паю:** {clean_str(row.get('RemovedShareNumber'))}")
+                rem_area = row.get('RemovedArea')
+                st.write(f"**Вилучена площа:** {rem_area if pd.notnull(rem_area) else 0} га")
+            with d2:
+                st.write(f"**Контрагент:** {clean_str(row.get('LandmanCounterparty'))}")
+                st.write(f"**Дата винесення меж:** {fmt_date(row.get('BoundarySettingDate'))}")
+                st.write(f"**Дата розірвання в 1С:** {fmt_date(row.get('TerminationDate1C'))}")
+                st.write(f"**Опрацював:** {clean_str(row.get('OfficerName'))} ({fmt_date(row.get('DecisionDate'), '%d.%m.%Y %H:%M')})")
+            st.write(f"**Коментар ЗС:** {clean_str(row.get('LandmanComment'))}")
     
     # --- КНОПКА ДІЇ ---
     if tab_type in ['out', 'res'] and (subrole in ['Type1', 'Type2'] or user_role == 'Admin'):
