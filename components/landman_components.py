@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-from queries.landman_queries import save_landman_decision
+from queries.landman_queries import deactivate_decision, save_landman_decision
 
 
 def clean_str(val, default="-"):
@@ -12,6 +12,11 @@ def clean_str(val, default="-"):
 def fmt_date(val, fmt='%d.%m.%Y'):
     dt = pd.to_datetime(val, errors='coerce')
     return dt.strftime(fmt) if pd.notnull(dt) else '-'
+
+def to_date(val):
+    """Для st.date_input: повертає date або None"""
+    dt = pd.to_datetime(val, errors='coerce')
+    return dt.date() if pd.notnull(dt) else None
 
 def render_landman_card(row, uid, contract_num, owner, tab_type, subrole, user_role, on_process_click):
     """Малює розширену картку договору для Земельника"""
@@ -78,6 +83,18 @@ def render_landman_card(row, uid, contract_num, owner, tab_type, subrole, user_r
         and st.button("📝 Опрацювати рішення", key=f"btn_land_{uid}")
     ):
         on_process_click(uid, contract_num, owner, row)
+        # --- РЕДАГУВАННЯ / ДЕАКТИВАЦІЯ РІШЕННЯ (вкладка "Оброблено ЗС") ---
+    can_edit = subrole in ['Type1', 'Type2'] or user_role == 'Admin'
+    if tab_type == 'done' and can_edit:
+        if clean_str(row.get('ManagerOutcome')) == 'Залишається':
+            st.warning("Фахівець змінив результат на «Залишається». Рішення ЗС більше не актуальне.")
+            if st.button("🗑️ Деактивувати рішення", key=f"deact_done_{uid}"):
+                deactivate_decision(uid, None, st.session_state['user_id'])
+                st.cache_data.clear()
+                st.rerun()
+        elif st.button("✏️ Редагувати рішення", key=f"edit_land_{uid}"):
+            st.session_state['process_edit_decision'] = True
+            on_process_click(uid, contract_num, owner, row)
     st.markdown("---")
 
 def render_landman_form(on_save_callback=None):
@@ -87,7 +104,8 @@ def render_landman_form(on_save_callback=None):
     owner = st.session_state.get('process_owner')
     row = st.session_state.get('process_data', {})
     
-    st.subheader("🛠️ Опрацювання рішення фахівця")
+    is_edit = st.session_state.get('process_edit_decision', False)
+    st.subheader("✏️ Редагування рішення ЗС" if is_edit else "🛠️ Опрацювання рішення фахівця")
     st.markdown(f"Пайовик: **:green[{owner}]** | Договір: **:green[{contract_num}]**")
     
     with st.container(border=True):
@@ -100,25 +118,25 @@ def render_landman_form(on_save_callback=None):
             rem_area = st.number_input("Вилучена площа (га)", value=float(row.get('RemovedArea') if pd.notnull(row.get('RemovedArea')) else (row.get('Area') or 0.0)))
         
         with col2:
-            counterparty = st.text_input("Пайовик (Контрагент)", value=owner)
-            comment = st.text_area("Коментар Земельної служби")
-            bound_date = st.date_input("Дата винесення меж в натуру", value=None)
-            term_date = st.date_input("Дата розірвання в 1С", value=None)
+            counterparty = st.text_input("Пайовик (Контрагент)", value=clean_str(row.get('LandmanCounterparty'), owner))
+            comment = st.text_area("Коментар Земельної служби", value=clean_str(row.get('LandmanComment'), ""))
+            bound_date = st.date_input("Дата винесення меж в натуру", value=to_date(row.get('BoundarySettingDate')))
+            term_date = st.date_input("Дата розірвання в 1С", value=to_date(row.get('TerminationDate1C')))
             
         c_btn1, c_btn2 = st.columns(2)
-        if c_btn1.button("💾 Зберегти та закрити", type="primary", use_container_width=True):
+        if c_btn1.button("💾 Зберегти зміни" if is_edit else "💾 Зберегти та закрити", type="primary", use_container_width=True):
             save_landman_decision(
                 uid, st.session_state['user_id'], rem_cad, rem_vil, rem_field, 
                 rem_share, rem_area, counterparty, comment, bound_date, term_date
             )
             st.success("✅ Дані збережено!")
-            for k in ['process_contract_uid', 'process_contract_num', 'process_owner', 'process_data']:
-                del st.session_state[k]
+            for k in ['process_contract_uid', 'process_contract_num', 'process_owner', 'process_data', 'process_notification_id', 'process_edit_decision']:
+                st.session_state.pop(k, None)
             if on_save_callback:
                on_save_callback()
             st.rerun()
             
         if c_btn2.button("❌ Скасувати", use_container_width=True):
-            for k in ['process_contract_uid', 'process_contract_num', 'process_owner', 'process_data']:
-                del st.session_state[k]
+            for k in ['process_contract_uid', 'process_contract_num', 'process_owner', 'process_data', 'process_notification_id', 'process_edit_decision']:
+                st.session_state.pop(k, None)
             st.rerun()

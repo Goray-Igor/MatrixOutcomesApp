@@ -48,12 +48,11 @@ def save_landman_decision(record_uid, officer_id, rem_cad, rem_vil, rem_field, r
     query_update = "UPDATE tbl_Manager_Results SET ProcessingStatus = 'Processed' WHERE RecordUID = ?"
     execute_query(query_update, (record_uid,), fetch=False)
 
-    # 4. Закриваємо сповіщення (якщо обробка була з вкладки сповіщень)
-    if notification_id:
-        execute_query(
-            "UPDATE tbl_LandOfficer_Notifications SET Status = 'Processed', ProcessedBy = ?, ProcessedAt = GETDATE() WHERE NotificationID = ? AND Status = 'New'",
-            (officer_id, notification_id), fetch=False
-        )
+        # 4. Закриваємо відкриті сповіщення по цьому запису (з вкладки сповіщень або ручне редагування)
+    execute_query(
+        "UPDATE tbl_LandOfficer_Notifications SET Status = 'Processed', ProcessedBy = ?, ProcessedAt = GETDATE() WHERE RecordUID = ? AND Status = 'New'",
+        (officer_id, record_uid), fetch=False
+    )
 
 def get_landman_notifications():
     """Нові сповіщення про зміни фахівців у вже опрацьованих ЗС записах"""
@@ -79,6 +78,6 @@ def deactivate_decision(record_uid, notification_id, officer_id):
         (record_uid,), fetch=False
     )
     execute_query(
-        "UPDATE tbl_LandOfficer_Notifications SET Status = 'Deactivated', ProcessedBy = ?, ProcessedAt = GETDATE() WHERE NotificationID = ? AND Status = 'New'",
-        (officer_id, notification_id), fetch=False
+        "UPDATE tbl_LandOfficer_Notifications SET Status = 'Deactivated', ProcessedBy = ?, ProcessedAt = GETDATE() WHERE RecordUID = ? AND Status = 'New'",
+        (officer_id, record_uid), fetch=False
     )
